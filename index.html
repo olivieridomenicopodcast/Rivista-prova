@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Interferenza</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap">
+<style>
+/* Concept: un mensile fisico sfogliabile su una scrivania. Ogni articolo ha una pagina-colore (apertura) e una pagina di carta (testo + esperimento). Motivo guida: l'interferenza fra due onde. */
+:root{
+  --desk:#D5D9E1; --chrome:#14161F; --chrome-dim:#586075; --chrome-fill:#ffffff8c; --chrome-line:#14161F40;
+  --paper:#F1F2EE; --ink:#14161F; --ink-soft:#505669; --rule:#14161F2e;
+  --blue:#2B3BFF; --red:#F2432E;
+  --display:'Bricolage Grotesque','Arial Narrow',Impact,sans-serif;
+  --serif:'Newsreader',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--desk:#0B0C11;--chrome:#E9EBF3;--chrome-dim:#9BA2B6;--chrome-fill:#ffffff14;--chrome-line:#e9ebf34d;color-scheme:dark}}
+:root[data-theme="dark"]{--desk:#0B0C11;--chrome:#E9EBF3;--chrome-dim:#9BA2B6;--chrome-fill:#ffffff14;--chrome-line:#e9ebf34d;color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:var(--desk);color:var(--chrome);font:12px/1.3 var(--mono)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+
+.app{height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:10px 4px}
+.brand{font:800 20px/1 var(--display);font-variation-settings:"wdth" 75;letter-spacing:.01em;text-transform:uppercase;margin:0}
+.top .meta{display:flex;align-items:center;gap:14px;color:var(--chrome-dim)}
+.hint{display:none}
+@media(min-width:900px){.hint{display:inline}}
+.tbtn{background:var(--chrome-fill);border:1px solid var(--chrome-line);padding:6px 10px;border-radius:999px;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+
+.stage{position:relative;flex:1;min-height:0;display:grid;place-items:center;touch-action:pan-y}
+.book{position:relative;perspective:2800px;transition:transform .9s cubic-bezier(.5,.05,.25,1);width:calc(var(--pw) * 2);height:var(--ph)}
+.book.single{width:var(--pw)}
+.floor{position:absolute;left:4%;right:4%;bottom:-14px;height:26px;background:radial-gradient(closest-side,#0000008c,transparent);filter:blur(7px);pointer-events:none}
+.leaf{position:absolute;top:0;left:50%;width:var(--pw);height:var(--ph);transform-origin:left center;transform-style:preserve-3d;transition:transform .95s cubic-bezier(.5,.05,.25,1)}
+.leaf.flipped{transform:rotateY(-180deg)}
+.single .leaf{left:0;transition:transform .8s cubic-bezier(.5,.05,.25,1),opacity .6s ease .15s}
+.single .leaf.flipped{transform:rotateY(-100deg);opacity:0;pointer-events:none}
+.face{position:absolute;inset:0;overflow:hidden;container-type:size;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--paper)}
+.face.back{transform:rotateY(180deg)}
+.face::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:5}
+.face.front::after{background:linear-gradient(90deg,#00000038,#0000 6%)}
+.face.back::after{background:linear-gradient(270deg,#00000038,#0000 6%)}
+.book.single{box-shadow:0 16px 36px #00000047}.single .floor{display:none}
+.single .face::after{background:linear-gradient(90deg,#00000020,#0000 4%)}
+
+.nav{display:grid;gap:8px;padding-block:8px 12px}
+.navrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.navrow .lbl{flex:1;text-align:center;text-transform:uppercase;letter-spacing:.08em;font-size:11px}
+.arrow{width:42px;height:34px;display:grid;place-items:center;background:var(--chrome-fill);border:1px solid var(--chrome-line);border-radius:999px}
+.arrow:disabled{opacity:.3;cursor:default}
+.chips{display:flex;gap:6px;justify-content:center;overflow-x:auto;scrollbar-width:none}
+.chip{display:flex;align-items:center;gap:7px;background:none;border:1px solid transparent;padding:5px 8px;border-radius:999px;white-space:nowrap;color:var(--chrome-dim);flex:none}
+.chip i{width:14px;height:14px;border-radius:50%;background:var(--bg);display:block;box-shadow:0 0 0 1px var(--chrome-line)}
+.chip span{display:none}
+.chip[aria-current="true"]{border-color:var(--chrome);color:var(--chrome)}
+.chip.ix i{background:var(--chrome)}
+@media(min-width:1180px){.chip span{display:inline}}
+
+/* ---------- pagine ---------- */
+.page{--u:1cqw;position:absolute;inset:0;display:flex;flex-direction:column;gap:calc(var(--u)*2);padding:calc(var(--u)*3.4) calc(var(--u)*3.6) calc(var(--u)*6);overflow-y:auto;scrollbar-width:thin;font:400 clamp(13.5px,2.8cqw,16.5px)/1.45 var(--serif);text-wrap:pretty}
+.page p{margin:0}
+.opener{background:var(--bg);color:var(--fg)}
+.bodypage{background:var(--paper);color:var(--ink)}
+.kicker{display:flex;justify-content:space-between;gap:12px;font:500 clamp(9.5px,1.9cqw,11.5px)/1.3 var(--mono);text-transform:uppercase;letter-spacing:.08em}
+.kicker b{font-weight:600}
+.title{margin:0;font:800 clamp(32px,11.4cqw,78px)/.88 var(--display);font-variation-settings:"wdth" 75;font-stretch:75%;letter-spacing:-.015em;text-wrap:balance}
+.dek{font:500 clamp(14px,3.05cqw,18px)/1.32 var(--serif);max-width:38ch}
+.art{flex:1 1 auto;min-height:150px;display:grid;place-items:center}
+.art>svg{width:100%;height:100%}
+.art>.widget{align-self:start;width:100%}
+.folio{position:absolute;left:calc(var(--u)*3.6);right:calc(var(--u)*3.6);bottom:calc(var(--u)*2.2);display:flex;justify-content:space-between;gap:10px;font:500 clamp(9px,1.8cqw,10.5px)/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;opacity:.72}
+.folio.r{flex-direction:row-reverse}
+.bodypage p:first-of-type{font-weight:450}
+.bodypage p:first-of-type::first-line{font-variant:small-caps;letter-spacing:.04em}
+.bodypage blockquote{margin:calc(var(--u)*.6) 0;font:800 clamp(20px,6cqw,36px)/.98 var(--display);font-variation-settings:"wdth" 75;font-stretch:75%;color:var(--hi);text-wrap:balance}
+button.x{all:unset;box-sizing:border-box;display:block;margin-top:auto;padding-top:.8em;border-top:1px solid var(--rule);cursor:pointer;width:100%}
+button.x:focus-visible{outline:2px solid var(--hi);outline-offset:3px}
+button.x small{display:block;font:500 clamp(9.5px,1.9cqw,11px)/1.3 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--hi);margin-bottom:.3em}
+button.x span{font-style:italic;color:var(--ink-soft)}
+
+/* palette per articolo */
+.c-giochi{--bg:#F2432E;--fg:#190908;--ac:#FFF1DC;--hi:#C8301D}
+.c-video{--bg:#2B3BFF;--fg:#FFFFFF;--ac:#FFD84A;--hi:#2B3BFF}
+.c-musica{--bg:#3A1D8F;--fg:#F4F0FF;--ac:#FF9347;--hi:#5B2BD6}
+.c-comp{--bg:#10A397;--fg:#04201D;--ac:#FFF6E0;--hi:#0B7F76}
+.c-pod{--bg:#FFB5D3;--fg:#3A0D26;--ac:#D4006C;--hi:#B80060}
+.c-radio{--bg:#17110A;--fg:#F6E8CC;--ac:#FFB000;--hi:#A86400}
+.c-vibe{--bg:#D8F23C;--fg:#14161F;--ac:#2B3BFF;--hi:#2B3BFF}
+.c-geo{--bg:#9ED8EE;--fg:#0B2A44;--ac:#E8552B;--hi:#C23A12}
+.c-libri{--bg:#5A1424;--fg:#F6EBD3;--ac:#F2B65A;--hi:#8E1E39}
+
+.f-fg{fill:var(--fg)}.f-ac{fill:var(--ac)}.f-bg{fill:var(--bg)}
+.s-fg{stroke:var(--fg);fill:none}.s-ac{stroke:var(--ac);fill:none}
+svg text{font-family:var(--mono);fill:var(--fg)}
+
+/* widget */
+.widget{display:grid;gap:.75em;padding:.9em 1em;border:1.5px solid currentColor}
+.opener .widget{--wb:var(--fg);--wt:var(--bg);--wa:var(--ac)}
+.bodypage .widget{--wb:var(--hi);--wt:#fff;--wa:var(--hi)}
+.wl{display:flex;justify-content:space-between;align-items:baseline;gap:1em;font:500 clamp(10px,2cqw,12px)/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em}
+.wl output,.wl b{font-weight:600}
+.wout{font:500 clamp(14px,3cqw,17px)/1.3 var(--serif)}
+.wout b{font-weight:700}
+.wnote{font:400 clamp(9.5px,1.9cqw,11px)/1.35 var(--mono);opacity:.8}
+.widget input[type=range]{width:100%;accent-color:var(--wa);margin:0}
+.btn{font:600 clamp(11px,2.3cqw,13px)/1 var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:.8em 1em;background:var(--wb);color:var(--wt);border:0}
+.btn.ghost{background:none;color:inherit;border:1.5px solid currentColor}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:.6em}
+.row>*{min-width:0}
+.widget input[type=text]{flex:1;font:600 clamp(14px,3cqw,17px) var(--mono);padding:.55em .7em;background:none;color:inherit;border:1.5px solid currentColor;text-transform:uppercase;letter-spacing:.12em;border-radius:0}
+.sw{display:flex;align-items:center;gap:.4em;cursor:pointer}
+.sw input{accent-color:var(--wa)}
+.strip{display:grid;grid-template-columns:repeat(var(--n,16),1fr);gap:2px}
+.strip i{height:1.2em;background:var(--rule)}
+.strip i.on{background:var(--wa)}
+.doors{display:grid;grid-template-columns:1fr 1fr;gap:.6em}
+.lamp{width:14px;height:14px;border-radius:50%;border:1.5px solid currentColor;display:inline-block}
+.lamp.on{background:var(--wa);box-shadow:0 0 12px var(--wa)}
+.morse{font:500 clamp(14px,3cqw,18px)/1.5 var(--mono);letter-spacing:.14em;word-break:break-all;min-height:1.5em}
+.morse .m{opacity:.55}.morse .m.lit{opacity:1;color:var(--wa)}
+.geo{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.4em,1fr));gap:.5em}
+.geo button{text-align:left;padding:.6em .7em;border:1.5px solid currentColor;background:none;min-height:5.6em;display:grid;align-content:start;gap:.3em}
+.geo button b{font:800 1.25em/1 var(--display);font-variation-settings:"wdth" 75}
+.geo button em{font-style:normal;font:400 .82em/1.3 var(--serif);display:none}
+.geo button small{font:500 9.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;opacity:.7}
+.geo button[aria-pressed="true"]{background:var(--wb);color:var(--wt)}
+.geo button[aria-pressed="true"] em{display:block}
+.geo button[aria-pressed="true"] small{display:none}
+.pgs{display:grid;grid-template-columns:repeat(25,1fr);gap:2px}
+.pgs i{height:1.1em;background:var(--rule)}.pgs i.on{background:var(--wa)}
+.big{font:800 clamp(38px,12cqw,72px)/.9 var(--display);font-variation-settings:"wdth" 75;color:var(--wa)}
+details{font:400 clamp(12px,2.4cqw,14px)/1.4 var(--serif)}
+details summary{cursor:pointer;font:500 clamp(10px,2cqw,12px) var(--mono);text-transform:uppercase;letter-spacing:.06em}
+details ol{columns:2;column-gap:1.4em;margin:.5em 0 0;padding-left:1.4em}
+details li.hot{font-weight:700;color:var(--hi)}
+.widget.comp{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center}
+.widget.comp canvas{width:100%;aspect-ratio:1;display:block}
+.widget.comp .ctl{display:grid;gap:.6em}
+.widget.pod svg{width:100%;height:auto;display:block}
+.chips2{display:flex;flex-wrap:wrap;gap:.4em}
+.chips2 button{font:500 clamp(10px,2cqw,12px)/1.2 var(--mono);padding:.5em .7em;border:1.5px solid currentColor;background:none;border-radius:999px}
+.chips2 button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.vbig{display:flex;align-items:baseline;gap:.8em;flex-wrap:wrap}
+.vbig b{font:800 clamp(40px,13cqw,80px)/.9 var(--display);font-variation-settings:"wdth" 75}
+.vbig span{font:400 clamp(9.5px,1.9cqw,11px)/1.3 var(--mono);text-transform:uppercase;letter-spacing:.05em;max-width:18ch}
+.dots{display:grid;grid-template-columns:repeat(32,1fr);gap:2px}
+.dots i{aspect-ratio:1;background:var(--fg);opacity:.14}.dots i.on{opacity:1}
+
+/* copertina e pagine speciali */
+.cover{background:var(--paper);color:var(--ink);gap:calc(var(--u)*1.6)}
+.cover .top2{display:flex;justify-content:space-between;gap:10px;font:500 clamp(9px,1.8cqw,10.5px)/1.3 var(--mono);text-transform:uppercase;letter-spacing:.07em}
+.mast{width:100%;height:auto;display:block;margin-top:-.4em}
+.mast text{font:800 60px var(--display);font-variation-settings:"wdth" 75;fill:var(--ink)}
+.cover .cl{font:800 clamp(24px,8.4cqw,56px)/.92 var(--display);font-variation-settings:"wdth" 75;font-stretch:75%;margin:0;text-wrap:balance}
+.panel{position:relative;flex:1 1 auto;min-height:120px;overflow:hidden;isolation:isolate;background:#fff}
+.panel i{position:absolute;inset:-12%;mix-blend-mode:multiply}
+.panel i:nth-child(1){background:repeating-radial-gradient(circle at 30% 36%,var(--blue) 0 .55cqw,#0000 .55cqw 1.9cqw)}
+.panel i:nth-child(2){background:repeating-radial-gradient(circle at 70% 64%,var(--red) 0 .55cqw,#0000 .55cqw 2.1cqw)}
+.teasers{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--ink);margin-bottom:calc(var(--u)*1)}
+.teasers button{all:unset;cursor:pointer;padding:.7em .8em .2em 0;border-right:1px solid var(--rule);margin-right:.8em;font:600 clamp(12px,2.6cqw,15px)/1.2 var(--display);font-variation-settings:"wdth" 80}
+.teasers button:last-child{border:0;margin:0}
+.teasers small{display:block;font:500 clamp(9px,1.8cqw,10.5px) var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--hi);margin-bottom:.3em}
+.back{background:var(--ink);color:#F1F2EE}
+.back .panel{background:var(--ink)}
+.back .panel i{mix-blend-mode:screen}
+.back .panel i:nth-child(1){background:repeating-radial-gradient(circle at 36% 40%,#6f7cff 0 .35cqw,#0000 .35cqw 1.8cqw)}
+.back .panel i:nth-child(2){background:repeating-radial-gradient(circle at 64% 60%,#ff7a68 0 .35cqw,#0000 .35cqw 2cqw)}
+.back .cl{color:#F1F2EE}
+.idx{display:grid;gap:0}
+.idx button{all:unset;cursor:pointer;display:grid;grid-template-columns:1.1em 1fr auto;gap:.8em;align-items:baseline;padding:.55em 0;border-bottom:1px solid var(--rule)}
+.idx button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.idx i{width:.8em;height:.8em;background:var(--bg);display:block;align-self:center}
+.idx b{font:700 1.18em/1.05 var(--display);font-variation-settings:"wdth" 80}
+.idx em{display:block;font:400 .82em/1.3 var(--serif);color:var(--ink-soft)}
+.idx span{font:500 .78em var(--mono)}
+.ann{display:grid;gap:.7em}
+.ann p{border:1.5px dashed var(--ink);padding:.7em .9em;font:400 .93em/1.4 var(--mono)}
+.ann b{text-transform:uppercase;letter-spacing:.06em}
+.notes h3{font:700 1em/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;margin:.6em 0 .3em;color:var(--hi)}
+.notes p,.notes li{font:400 .88em/1.4 var(--serif)}
+.notes ul{margin:0;padding-left:1.1em}
+.notes{color:var(--ink)}
+.notes{--hi:#5B2BD6}
+svg.diag{width:100%;height:auto}
+svg.diag text{fill:var(--ink)}
+
+@media(prefers-reduced-motion:reduce){.leaf,.book{transition-duration:.01s!important;transition-delay:0s!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1 class="brand">Interferenza</h1>
+    <div class="meta"><span class="hint">← → · swipe · clic sul margine</span><span>n.&nbsp;1 · nov 2026</span><button class="tbtn" id="theme" type="button">Tema</button></div>
+  </header>
+  <main class="stage" id="stage"><div class="book" id="book"></div></main>
+  <nav class="nav" aria-label="Navigazione della rivista">
+    <div class="navrow">
+      <button class="arrow" id="prev" type="button" aria-label="Pagina precedente">←</button>
+      <div class="lbl" id="lbl" aria-live="polite"></div>
+      <button class="arrow" id="next" type="button" aria-label="Pagina successiva">→</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </nav>
+</div>
+<noscript>Questa rivista ha bisogno di JavaScript per essere sfogliata.</noscript>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const rnd=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+
+/* ================= grafiche (SVG) ================= */
+function gEdit(){
+  const W=400,pts=(f,p,a,y)=>{let d='';for(let x=0;x<=W;x+=2){d+=(x?'L':'M')+x+' '+(y-a*Math.sin(2*Math.PI*x/f+p)).toFixed(1)}return d};
+  let sum='';for(let x=0;x<=W;x+=2){const v=Math.sin(2*Math.PI*x/78)+Math.sin(2*Math.PI*x/94+1);sum+=(x?'L':'M')+x+' '+(212-v*21).toFixed(1)}
+  return `<svg class="diag" viewBox="0 0 400 260" role="img" aria-label="Due onde e la loro somma">
+  <text x="0" y="14" font-size="10" letter-spacing="1">ONDA A</text><path d="${pts(78,0,20,44)}" fill="none" stroke="var(--blue)" stroke-width="2"/>
+  <text x="0" y="90" font-size="10" letter-spacing="1">ONDA B</text><path d="${pts(94,1,20,120)}" fill="none" stroke="var(--red)" stroke-width="2"/>
+  <line x1="0" x2="400" y1="212" y2="212" stroke="#14161f33"/>
+  <text x="0" y="166" font-size="10" letter-spacing="1">A + B: IL DISEGNO CHE NON STA IN NESSUNA DELLE DUE</text><path d="${sum}" fill="none" stroke="#14161F" stroke-width="2.4"/></svg>`;
+}
+function gGiochi(){
+  const cx=200,cy=140,R=100,n=5,P=[];
+  for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n;P.push([cx+R*Math.cos(a),cy+R*Math.sin(a)])}
+  let s='';
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const you=i===0;s+=`<line x1="${P[i][0].toFixed(1)}" y1="${P[i][1].toFixed(1)}" x2="${P[j][0].toFixed(1)}" y2="${P[j][1].toFixed(1)}" class="s-fg" stroke-width="${you?2.6:1}" opacity="${you?.95:.4}"/>`}
+  s+=`<circle cx="${cx}" cy="${cy}" r="58" class="s-fg" stroke-dasharray="2 6"/>`;
+  let hex='';for(let i=0;i<6;i++){const a=Math.PI/6+i*Math.PI/3;hex+=(cx+28*Math.cos(a)).toFixed(1)+','+(cy+28*Math.sin(a)).toFixed(1)+' '}
+  s+=`<polygon points="${hex}" class="f-ac"/>`;
+  P.forEach((p,i)=>{s+=i===0?`<circle cx="${p[0]}" cy="${p[1]}" r="19" class="f-ac"/><text x="${p[0]}" y="${p[1]+4}" text-anchor="middle" font-size="11" font-weight="600" class="f-bg" style="fill:var(--bg)">TU</text>`:`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="14" class="f-fg"/>`});
+  s+=`<text x="0" y="288" font-size="10" letter-spacing="1">TU GIOCHI 1 TURNO SU 5. GLI ALTRI 4 SONO SGUARDI.</text>`;
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="Cinque giocatori attorno a un tavolo, collegati dagli sguardi">${s}</svg>`;
+}
+function gVideo(){
+  let s='';
+  for(let i=5;i>=0;i--){
+    const x=10+i*34,y=14+i*26,o=(1-i*.13).toFixed(2);
+    s+=`<g transform="translate(${x} ${y})" opacity="${o}" shape-rendering="crispEdges"><polygon points="0,0 112,0 132,20 132,132 0,132" class="f-ac"/><rect x="26" y="0" width="64" height="38" class="f-fg"/><rect x="68" y="8" width="12" height="22" class="f-bg"/><rect x="14" y="66" width="104" height="66" style="fill:#fff"/><text x="66" y="104" text-anchor="middle" font-size="13" font-weight="600" style="fill:#14161F">SLOT ${i+1}</text></g>`;
+  }
+  s+=`<text x="10" y="290" font-size="10" letter-spacing="1">UNA SCELTA = UNA RIGA PERSA, O NO.</text>`;
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="Una pila di floppy disk con gli slot di salvataggio">${s}</svg>`;
+}
+function gMusica(){
+  const r=rnd(7);let d='',g='',q='';
+  for(let x=0;x<=400;x+=50){g+=`<line x1="${x}" x2="${x}" y1="40" y2="262" class="s-fg" opacity="${x%200===0?.6:.25}"/>`;q+=`<rect x="${x-3}" y="270" width="6" height="6" class="f-ac"/>`}
+  for(let x=2;x<400;x+=2.6){const ph=(x%50)/50,env=.16+.84*Math.exp(-ph*5.2),h=112*env*(.3+.7*r());d+=`M${x.toFixed(1)} ${(151-h).toFixed(1)}V${(151+h).toFixed(1)}`}
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="Un'onda caotica agganciata a una griglia ritmica">${g}<path d="${d}" class="s-ac" stroke-width="1.8"/><text x="0" y="22" font-size="10" letter-spacing="1">180 BPM · IL CAOS ENTRA SEMPRE SULLA GRIGLIA</text>${q}</svg>`;
+}
+function gLibri(){
+  const r=rnd(11);let s='',read=0,tot=0;
+  [150,284].forEach((y,row)=>{
+    let x=12;
+    while(x<(row?378:340)){
+      const w=10+r()*15,h=(row?70:60)+r()*62,isRead=r()<.2;tot++;if(isRead)read++;
+      s+=isRead?`<rect x="${x.toFixed(1)}" y="${(y-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" class="f-ac"/>`:`<rect x="${x.toFixed(1)}" y="${(y-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" class="s-fg" stroke-width="1.6"/><line x1="${x+2}" x2="${x+w-2}" y1="${(y-h+14).toFixed(1)}" y2="${(y-h+14).toFixed(1)}" class="s-fg" opacity=".5"/>`;
+      x+=w+(r()<.12?7:1.6);
+    }
+    if(!row){s+=`<g transform="rotate(-17 ${x+26} ${y})"><rect x="${x+8}" y="${y-112}" width="20" height="112" class="s-fg" stroke-width="1.6"/></g><path d="M${x-40} ${y-60}l5 -16l5 16z" class="f-ac"/>`}
+    s+=`<rect x="6" y="${y}" width="388" height="5" class="f-fg"/>`;
+  });
+  s+=`<text x="12" y="16" font-size="10" letter-spacing="1">PIENI: LETTI (${read}) · VUOTI: ANCORA DA LEGGERE (${tot-read})</text>`;
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="Scaffali con pochi libri letti e molti non letti">${s}</svg>`;
+}
+function gGeo(){
+  const cx=212,cy=150,X=(k,t)=>{const w=1+.2*Math.sin(3*t+1.3)+.12*Math.sin(5*t+.4)+.07*Math.sin(2*t+2.1);return[cx+k*10.5*w*1.35*Math.cos(t),cy+k*10.5*w*.95*Math.sin(t)]};
+  let s='';
+  for(let k=1;k<=13;k++){let d='';for(let i=0;i<=90;i++){const p=X(k,i/90*2*Math.PI);d+=(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)}
+    s+=`<path d="${d}Z" class="s-fg" stroke-width="${k%4===0?2:1}" style="opacity:${(.32+.68*k/13).toFixed(2)}"/>`}
+  const pin=X(9,.55);
+  s+=`<line x1="${pin[0]}" y1="${pin[1]}" x2="${pin[0]-26}" y2="${pin[1]+40}" class="s-fg" stroke-width="1.4"/><circle cx="${pin[0]}" cy="${pin[1]}" r="6" class="f-ac"/><text x="${pin[0]-30}" y="${pin[1]+54}" text-anchor="end" font-size="11" font-weight="600">PISAURUM</text><text x="${pin[0]-30}" y="${pin[1]+67}" text-anchor="end" font-size="9">43°54′ N · 12°54′ E</text>`;
+  s+=`<text x="0" y="292" font-size="10" letter-spacing="1">CURVE DI LIVELLO. NOMI DI FOSSILI.</text>`;
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="Curve di livello di un'isola con un segnaposto">${s}</svg>`;
+}
+function gRadio(){
+  const cx=200,cy=262,R=188,L3=Math.log10(3);
+  const ang=f=>(200+(Math.log10(f)-L3)*140)*Math.PI/180;
+  const pt=(f,r)=>[cx+r*Math.cos(ang(f)),cy+r*Math.sin(ang(f))];
+  let s=`<path d="M${pt(3,R)[0]} ${pt(3,R)[1]}A${R} ${R} 0 0 1 ${pt(30,R)[0]} ${pt(30,R)[1]}" class="s-fg" opacity=".5"/>`;
+  for(let f=3;f<=30.01;f+=.5){const major=Number.isInteger(f),a=pt(f,R),b=pt(f,R-(major?16:8));s+=`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" class="s-fg" opacity="${major?.9:.45}"/>`}
+  [[3.5,'80 m'],[7,'40 m'],[14,'20 m'],[21,'15 m'],[28,'10 m']].forEach(([f,n])=>{const p=pt(f,R-32),q=pt(f,R-52);s+=`<text x="${p[0].toFixed(1)}" y="${p[1].toFixed(1)}" text-anchor="middle" font-size="12" font-weight="600" class="f-ac" style="fill:var(--ac)">${f}</text><text x="${q[0].toFixed(1)}" y="${q[1].toFixed(1)+0}" text-anchor="middle" font-size="8" opacity=".7" dy="1">${n}</text>`});
+  const n1=pt(14.2,R-4);
+  s+=`<line x1="${cx}" y1="${cy}" x2="${n1[0].toFixed(1)}" y2="${n1[1].toFixed(1)}" class="s-ac" stroke-width="2.4"/><circle cx="${cx}" cy="${cy}" r="11" class="f-ac"/><circle cx="${cx}" cy="${cy}" r="4" class="f-bg"/>`;
+  s+=`<text x="200" y="294" text-anchor="middle" font-size="10" letter-spacing="2">MHZ · ONDE CORTE · IL SOLE DECIDE</text>`;
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="Scala di una radio con le bande dei radioamatori">${s}</svg>`;
+}
+
+/* ================= widget (markup) ================= */
+const GEO=[['Rimini','Ariminum, dal nome latino del fiume Ariminus, oggi Marecchia.'],['Pesaro','Pisaurum, dal fiume Pisaurus, oggi chiamato Foglia.'],['Fano','Fanum Fortunae: il tempio della Fortuna.'],['Senigallia','Sena Gallica: colonia romana nel territorio dei Galli Senoni.'],['Ancona','Dal greco ankón, «gomito»: la forma del promontorio che chiude la baia.']];
+const DET=['per quante persone','telefono o computer','che dadi e quanti','come si vince','dove si vede il punteggio','cosa succede in pareggio','tono: serio o ironico','che aspetto ha','una partita d’esempio','cosa NON deve succedere'];
+const PENNAC=['Non leggere','Saltare le pagine','Non finire un libro','Rileggere','Leggere qualsiasi cosa','Il bovarismo','Leggere ovunque','Spizzicare','Leggere a voce alta','Tacere'];
+const W={
+giochi:`<div class="widget" data-w="giochi"><div class="wl"><label for="g-n">Giocatori al tavolo</label><output id="g-nv">4</output></div><input id="g-n" type="range" min="2" max="6" step="1" value="4"><div class="strip" id="g-strip" aria-hidden="true"></div><p class="wout" id="g-out"></p><p class="wnote" id="g-msg"></p></div>`,
+video:`<div class="widget" data-w="video"><div class="wl"><span>Un tesoro, una trappola</span><label class="sw"><input id="v-perma" type="checkbox"> Morte permanente</label></div><div class="doors"><button class="btn" type="button" data-door="0">Porta rossa</button><button class="btn" type="button" data-door="1">Porta blu</button></div><p class="wout" id="v-out">Scegli una porta.</p><div class="wl"><button class="btn ghost" id="v-reload" type="button" hidden>Carica ultimo salvataggio</button><span>Ricaricamenti: <b id="v-n">0</b></span></div></div>`,
+radio:`<div class="widget" data-w="radio"><div class="wl"><label for="m-t">Il tuo messaggio</label><span class="lamp" id="m-lamp" aria-hidden="true"></span></div><div class="row"><input id="m-t" type="text" maxlength="18" value="IU6TPD" autocomplete="off" spellcheck="false"><button class="btn" id="m-go" type="button">Trasmetti</button></div><p class="morse" id="m-out" aria-live="polite"></p><p class="wnote">Nota a 600 Hz, circa 12 parole al minuto.</p></div>`,
+geo:`<div class="widget" data-w="geo"><div class="wl"><span>Da nord a sud · tocca un nome</span></div><div class="geo">${GEO.map(g=>`<button type="button" aria-pressed="false"><b>${g[0]}</b><small>tocca</small><em>${g[1]}</em></button>`).join('')}</div></div>`,
+libri:`<div class="widget" data-w="libri"><div class="wl"><label for="l-age">La tua età</label><output id="l-av">35</output></div><input id="l-age" type="range" min="15" max="100" value="35"><div class="row" style="align-items:center"><span class="big" id="l-n">50</span><p class="wout" id="l-out"></p></div><div class="pgs" id="l-pgs" aria-hidden="true"></div><details><summary>I dieci diritti del lettore (Pennac)</summary><ol>${PENNAC.map((p,i)=>`<li class="${i===2?'hot':''}">${p}</li>`).join('')}</ol></details></div>`,
+comp:`<div class="widget comp" data-w="comp"><canvas id="pr-cv" role="img" aria-label="Due anelli di pulsazioni che girano"></canvas><div class="ctl"><div class="wl"><label for="pr-a">Anello esterno</label><output id="pr-av">3</output></div><input id="pr-a" type="range" min="2" max="9" value="3"><div class="wl"><label for="pr-b">Anello interno</label><output id="pr-bv">4</output></div><input id="pr-b" type="range" min="2" max="9" value="4"><p class="wout" id="pr-info"></p><button class="btn" id="pr-play" type="button">Ascolta</button></div></div>`,
+pod:`<div class="widget pod" data-w="pod"><div class="wl"><span>Episodio di esempio</span><b id="po-time">16’00”</b></div><svg id="po-svg" viewBox="0 0 400 110" role="img" aria-label="Forma d’onda di un episodio"></svg><div class="wl"><label for="po-cut">Silenzio tagliato</label><output id="po-cv">0%</output></div><input id="po-cut" type="range" min="0" max="100" value="0"><p class="wout" id="po-msg"></p></div>`,
+vibe:`<div class="widget" data-w="vibe"><p class="wnote">Richiesta: «Fammi un gioco con i dadi.» Aggiungi dettagli e guarda cosa resta.</p><div class="chips2" id="vb-chips">${DET.map(d=>`<button type="button" aria-pressed="false">${d}</button>`).join('')}</div><div class="vbig"><b id="vb-n">1.024</b><span>interpretazioni ragionevoli · stima illustrativa</span></div><div class="dots" id="vb-dots" aria-hidden="true"></div><p class="wout" id="vb-msg"></p></div>`
+};
+
+/* ================= contenuti ================= */
+const ART=[
+{id:'giochi',cls:'c-giochi',sez:'Giochi da tavolo',chiave:'l’attesa',titolo:'Il turno degli altri',
+ dek:'In una partita a quattro giochi per un quarto del tempo. Il resto lo passi a guardare. I designer lo chiamano downtime e lo combattono. Forse hanno sbagliato bersaglio.',
+ corpo:['Il filosofo Bernard Suits definì il gioco «il tentativo volontario di superare ostacoli non necessari». Un tavolo da gioco è uno dei pochi posti dove degli adulti si accordano su ostacoli inventati, e poi li prendono sul serio.','Ma nessuno guarda la plancia mentre aspetta. Guarda la faccia di chi sta decidendo. Il tabellone fa da fuoco acceso: dà agli occhi un posto dove stare quando non vuoi sembrare uno che fissa.','I giochi migliori non eliminano l’attesa, la riempiono di cose da leggere negli altri: un bluff, un’offerta, un sospiro. Domanda per ogni designer: cosa fa chi non è di turno?'],
+ g:gGiochi,w:'giochi',side:'right',link:['vibe','Un regolamento ben scritto toglie le interpretazioni. È il mestiere di chi spiega una cosa a una macchina.']},
+{id:'video',cls:'c-video',sez:'Videogiochi',chiave:'l’irreversibile',titolo:'Carica ultimo salvataggio',
+ dek:'Il valore di una scelta è proporzionale a quanto costa annullarla. Il videogioco ha inventato il tasto che cancella tutto, e poi ha dovuto imparare a convivere con le conseguenze.',
+ corpo:['In un libro non puoi tornare indietro e cambiare il finale. Puoi rileggerlo, che è un’altra cosa. Nel videogioco il salvataggio ha trasformato il destino in una variabile: se va male, si ricarica.','Chi ricarica finché non esce l’esito giusto non sta più scegliendo, sta estraendo a sorte con più tentativi. Per questo molti giochi che ricordiamo meglio ci hanno tolto il tasto: autosalvataggi, morte permanente, il fuoco che non si spegne. Non è sadismo, è restituire peso. Prova con e senza.'],
+ g:gVideo,w:'video',side:'right',link:['libri','Anche il lettore può tornare indietro. Si chiama rileggere, e non cancella niente.']},
+{id:'musica',cls:'c-musica',sez:'Musica',chiave:'il recinto',titolo:'Urlare a tempo',
+ dek:'La rabbia più rumorosa che esista è anche la più ordinata: 180 battiti al minuto, una griglia al millisecondo, un urlo che entra sempre sul tempo.',
+ corpo:['Chi non ascolta metal pensa a un incidente in studio. Chi lo suona sa che è un genere senza margine: se il batterista sbaglia di venti millisecondi, il muro diventa un mucchio di sassi.','Nel 2015 due ricercatori australiani, Sharman e Dingle, fecero arrabbiare dei volontari in laboratorio e poi fecero ascoltare loro musica estrema. Secondo lo studio la rabbia non aumentò, e crebbero invece le emozioni positive.','Un’ipotesi: la musica pesante non sfoga la rabbia, la mette in un recinto. Le dà un tempo, una griglia e una durata di tre minuti e quaranta, poi finisce. Il breakdown, quel punto in cui tutto rallenta e pesa di più, è il momento in cui il recinto si vede.'],
+ quote:'«La rabbia vera non ha il metronomo.»',g:gMusica,side:'none',link:['comp','Dentro la griglia c’è un altro trucco: far litigare due orologi.']},
+{id:'comp',cls:'c-comp',sez:'Composizione musicale',chiave:'la differenza',titolo:'Quando due orologi litigano',
+ dek:'Tre contro quattro non è un errore di conteggio. È il modo più vecchio per far nascere un ritmo da due regole che non si parlano.',
+ corpo:['Prendi due pulsazioni. Una divide il giro in tre, l’altra in quattro. Cadono insieme una sola volta, all’inizio. Per il resto del giro si rincorrono, e l’orecchio fa quello che sa fare meglio: cerca il punto in cui si rincontreranno, e intanto balla.','In acustica succede lo stesso. Due note quasi uguali, 440 e 444 hertz, producono un pulsare lento di quattro battiti al secondo che nessuno ha suonato: la differenza fra le due. Si chiamano battimenti.','Comporre in 7/8 è camminare con una scarpa più alta dell’altra: contando 2+2+3 il passo è storto, e per questo si sente. Regola da tasca: non scrivere solo ciò che c’è. Scrivi anche dove le due cose non si incontrano.'],
+ w:'comp',side:'left',link:['radio','Il tono del Morse che senti in cuffia è un battimento. Anche la radio ha il suo 444.']},
+{id:'pod',cls:'c-pod',sez:'Podcasting',chiave:'il respiro',titolo:'Il respiro tagliato',
+ dek:'Il montatore è l’unico professionista pagato per togliere. Il difficile è sapere quando smettere, perché in mezzo ai silenzi c’è la persona che parla.',
+ corpo:['Un podcast vive in mani occupate: piatti, volante, cuffie sul treno. L’ascoltatore non guarda niente, quindi gli serve un preavviso. Il respiro prima di una frase è quel preavviso: dice «sta per succedere qualcosa» un attimo prima che succeda.','Chi taglia tutti i respiri e tutte le pause toglie il preavviso, e con lui la persona. Il parlato resta perfetto e diventa inascoltabile. Il silenzio, in un episodio, non è tempo vuoto: è l’interfaccia.'],
+ quote:'«Si taglia l’imbarazzo. Il respiro no.»',w:'pod',side:'left',link:['radio','Prima del podcast c’era l’etere: stessa voce, ma in diretta e senza tasto taglia.']},
+{id:'radio',cls:'c-radio',sez:'Radioamatorismo',chiave:'il cielo',titolo:'Il cielo è un cavo',
+ dek:'Per parlare con Buenos Aires non serve internet. Serve uno strato di gas ionizzato a qualche centinaio di chilometri e un Sole disposto a collaborare.',
+ corpo:['Sulle onde corte il segnale sale, incontra la ionosfera, rimbalza e ricade a migliaia di chilometri. Lo specchio dipende dal Sole: dall’ora del giorno, dal ciclo di undici anni delle macchie solari. Il radioamatore è l’unica persona che controlla il meteo spaziale prima di cena.','Ogni collegamento comincia con una cosa strana: dici chi sei con un nome che non hai scelto e che nessun altro ha. L’indicativo. Poi ci si scambia un rapporto («ti ricevo cinque su nove») e ci si saluta con un numero: 73 vuol dire cordiali saluti, 88 baci e abbracci.','Quando salta tutto, rete, tralicci, corrente, resta l’unico cavo che nessuno ha dovuto stendere. Scrivi un nome e ascolta com’è fatto in Morse.'],
+ g:gRadio,w:'radio',side:'right',link:['geo','Il prefisso di un indicativo dice da che paese trasmetti. È la toponomastica dell’etere.']},
+{id:'vibe',cls:'c-vibe',sez:'Vibe coding',chiave:'l’ovvio',titolo:'Il bug è un malinteso',
+ dek:'Quando scrivi codice sbagli la sintassi. Quando lo descrivi a voce sbagli l’ovvio: quello che per te è chiaro e per l’altro no.',
+ corpo:['Nel codice classico un errore è un errore, e la macchina ti dice dove. Nel vibe coding la macchina capisce sempre qualcosa, e quasi sempre qualcosa di ragionevole. Il bug diventa un malinteso fra due interpreti in buona fede.','Cambia il mestiere. Da scrivere righe a dire l’ovvio: ogni cosa che hai in testa e non hai detto è un’ipotesi che la macchina riempirà a modo suo.','Il nuovo senior non è chi conosce più sintassi. È chi riconosce al volo la riga che sembra giusta e risponde a un’altra domanda. Il mestiere, adesso, è assaggiare.'],
+ w:'vibe',side:'left',link:['giochi','Un regolamento ben scritto fa lo stesso lavoro: elimina le interpretazioni prima che nascano.']},
+{id:'geo',cls:'c-geo',sez:'Geografia',chiave:'i nomi',titolo:'Il gomito, il tempio e il fiume',
+ dek:'Gli atlanti dicono dove. I nomi dicono chi c’era prima. Una costa si può leggere come una frase.',
+ corpo:['Un toponimo è l’unico monumento che non si può restaurare. Lo si può solo ripetere ad alta voce, per duemila anni, senza sapere cosa si sta dicendo.','Prendi la costa adriatica fra Romagna e Marche: cinque nomi in fila, e dentro ci sono un fiume, un tempio, una colonia di Galli e un gomito di mare. Toccali per vedere cosa nascondono.'],
+ g:gGeo,w:'geo',side:'right',link:['video','Ogni mappa di gioco è una geografia inventata, con nomi che fingono di avere duemila anni.']},
+{id:'libri',cls:'c-libri',sez:'Libri',chiave:'l’abbandono',titolo:'Il diritto di abbandono',
+ dek:'Una libreria piena di libri non letti non è un debito. È l’elenco delle persone che potresti diventare.',
+ corpo:['Si racconta che Umberto Eco ne tenesse circa trentamila e che molti visitatori gli chiedessero se li avesse letti tutti. Nassim Taleb ne ha ricavato l’idea di antibiblioteca: i libri non letti contano più dei letti, perché misurano quanto ancora non sai.','Daniel Pennac, in Come un romanzo, elenca dieci diritti del lettore. Il terzo è quello che tutti si negano: non finire un libro. Una regola pratica viene dalla bibliotecaria Nancy Pearl: dai a un libro cinquanta pagine. Dopo i cinquant’anni, dagliene cento meno la tua età.'],
+ g:gLibri,w:'libri',side:'right',link:['pod','Il nono diritto di Pennac è leggere a voce alta. Il podcast è quel diritto, con il montaggio.']}
+];
+ART.forEach((a,i)=>{a.pag=3+i*2});
+const byId=id=>ART.find(a=>a.id===id);
+
+/* ================= pagine ================= */
+const folio=(n,side)=>`<div class="folio ${side}"><span>${n}</span><span>Interferenza · n. 1 · novembre 2026</span></div>`;
+function opener(a){
+  const art=a.side==='left'?W[a.w]:a.g();
+  return `<div class="page opener ${a.cls}"><div class="kicker"><span>${a.sez}</span><span>chiave: <b>${a.chiave}</b></span></div><h2 class="title">${a.titolo}</h2><p class="dek">${a.dek}</p><div class="art">${art}</div>${folio(a.pag,'l')}</div>`;
+}
+function bodyPage(a){
+  const t=byId(a.link[0]);
+  return `<div class="page bodypage ${a.cls}"><div class="kicker"><span>${a.sez}</span><span>chiave: <b>${a.chiave}</b></span></div>${a.corpo.map(p=>`<p>${p}</p>`).join('')}${a.quote?`<blockquote>${a.quote}</blockquote>`:''}${a.side==='right'?W[a.w]:''}<button class="x" type="button" data-go="${t.id}"><small>Interferisce con · ${t.titolo} · pag. ${t.pag}</small><span>${a.link[1]}</span></button>${folio(a.pag+1,'r')}</div>`;
+}
+const PAGES=[];
+PAGES[0]=`<div class="page cover"><div class="top2"><span>Il mensile delle cose che c’entrano</span><span>n. 1 · anno I</span></div><svg class="mast" viewBox="0 0 300 62" role="img" aria-label="Interferenza"><text x="0" y="52" textLength="300" lengthAdjust="spacingAndGlyphs">INTERFERENZA</text></svg><h2 class="cl">Tutto c’entra con tutto. Quasi.</h2><div class="panel"><i></i><i></i></div><div class="teasers c-radio" style="--hi:#5B2BD6"><button type="button" data-go="radio"><small>Radio</small>Il cielo è un cavo</button><button type="button" data-go="pod"><small>Podcast</small>Il respiro tagliato</button><button type="button" data-go="libri"><small>Libri</small>Il diritto di abbandono</button></div><div class="top2"><span>Novembre 2026</span><span>6,00 euro, o una buona freddura</span></div></div>`;
+PAGES[1]=`<div class="page bodypage" style="--hi:#5B2BD6"><div class="kicker"><span>Editoriale</span><span>pag. 1</span></div><h2 class="title" style="font-size:clamp(34px,13cqw,84px)">Cosa c’entra?</h2>${gEdit()}<p>Quando dici che fai giochi da tavolo, musica, radio e podcast, qualcuno ti chiede sempre cosa c’entrano fra loro. Questo numero è la risposta, e la risposta è un fenomeno fisico.</p><p>Si chiama interferenza: due onde si incontrano e si sommano dove le creste coincidono, si cancellano dove una cresta incontra una valle. Il disegno che ne esce non sta in nessuna delle due onde. Sta nella sovrapposizione.</p><p>Nove temi, nessuno dal lato ovvio. Niente recensioni, niente classifiche: nove sbirciate di lato. <i>Buona sovrapposizione. La redazione.</i></p>${folio(1,'l')}</div>`;
+PAGES[2]=`<div class="page bodypage" style="--hi:#5B2BD6"><div class="kicker"><span>In questo numero</span><span>pag. 2</span></div><h2 class="title" style="font-size:clamp(30px,10cqw,64px)">Nove temi,<br>nove chiavi</h2><div class="idx">${ART.map(a=>`<button type="button" class="${a.cls}" data-go="${a.id}"><i></i><span><b>${a.titolo}</b><em>${a.sez} · chiave: ${a.chiave}</em></span><span>${a.pag}</span></button>`).join('')}<button type="button" data-go="p21"><i style="background:var(--ink)"></i><span><b>Piccoli annunci</b><em>Cerco, offro, regalo</em></span><span>21</span></button></div>${folio(2,'r')}</div>`;
+ART.forEach(a=>{PAGES[a.pag]=opener(a);PAGES[a.pag+1]=bodyPage(a)});
+PAGES[21]=`<div class="page bodypage" style="--hi:#5B2BD6"><div class="kicker"><span>Rubriche</span><span>pag. 21</span></div><h2 class="title" style="font-size:clamp(30px,10cqw,64px)">Piccoli annunci</h2><div class="ann"><p><b>Cercasi</b> persona che legga il regolamento ad alta voce senza saltare le eccezioni. Compenso: patatine.</p><p><b>Offresi</b> collegamento su 40 metri ogni domenica sera, ionosfera permettendo.</p><p><b>Cerco</b> tastierista che sappia contare fino a sette senza perdersi per strada.</p><p><b>Vendesi</b> antibiblioteca: 412 volumi, ottimo stato perché mai letti.</p><p><b>Regalasi</b> silenzio, tagliato da un episodio. Da usare con moderazione.</p><p><b>Cercasi</b> bug, anche vivo, per prompt in difficoltà.</p></div>${folio(21,'l')}</div>`;
+PAGES[22]=`<div class="page bodypage notes" style="--hi:#5B2BD6"><div class="kicker"><span>Dalla redazione</span><span>pag. 22</span></div><h3>Freddure (non verificate)</h3><ul><li>Ho provato a fare un podcast sul silenzio. Ho dovuto tagliare tutto.</li><li>Il vibe coder non ha bug. Ha comportamenti emergenti con un ottimo senso dell’umorismo.</li><li>Ho letto che i libri non letti sono l’antibiblioteca. Allora a casa mia c’è una cattedrale.</li></ul><h3>Note e fonti</h3><ul><li>B. Suits, <i>The Grasshopper</i> (1978).</li><li>L. Sharman, G. Dingle, «Extreme metal music and anger processing», <i>Frontiers in Human Neuroscience</i> (2015).</li><li>D. Pennac, <i>Come un romanzo</i> (1992). N. N. Taleb, <i>Il cigno nero</i>, sull’antibiblioteca. N. Pearl, regola delle cinquanta pagine.</li><li>Le etimologie dei toponimi sono quelle correnti, latine e greche.</li><li>Il numero delle interpretazioni nel pezzo sul vibe coding è una stima illustrativa.</li></ul><h3>Colophon</h3><p>Interferenza è un mensile immaginario, composto nel browser. Direttore: Niky. Redazione: Pesaro. Indicativo di redazione: IU6TPD. Il prossimo numero uscirà quando c’entrerà.</p>${folio(22,'r')}</div>`;
+PAGES[23]=`<div class="page cover back"><div class="top2"><span>Quarta di copertina</span><span>Interferenza · n. 1</span></div><h2 class="cl">Ti ricevo 5 su 9.</h2><div class="panel"><i></i><i></i></div><div class="top2"><span>Fine trasmissione</span><span>73</span></div></div>`;
+const N=PAGES.length;
+
+/* ================= audio ================= */
+let AC=null,audioStops=[];
+function ac(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state==='suspended')AC.resume();return AC}
+function blip(freq,t,dur,vol,type){const c=AC,o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.value=freq;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.006);g.gain.setValueAtTime(vol,Math.max(t+.006,t+dur-.01));g.gain.linearRampToValueAtTime(0,t+dur);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+dur+.02)}
+function stopAudio(){audioStops.forEach(f=>{try{f()}catch(e){}});audioStops=[]}
+
+/* ================= widget logic ================= */
+function wGiochi(){
+  const r=$('#g-n');if(!r)return;const out=$('#g-out'),strip=$('#g-strip'),nv=$('#g-nv'),msg=$('#g-msg');
+  const M={2:'A due, l’attesa si fa nuda: ti guarda una persona sola.',3:'A tre, c’è sempre qualcuno che non guarda nessuno.',4:'A quattro si gioca per un quarto del tempo e si osserva per tre quarti.',5:'A cinque la partita è soprattutto un pubblico con un turno ogni tanto.',6:'A sei sei quasi spettatore pagante.'};
+  const up=()=>{const n=+r.value,cells=n*4,mine=Math.round(90/n);nv.textContent=n;strip.style.setProperty('--n',cells);strip.innerHTML=Array.from({length:cells},(_,i)=>`<i class="${i%n===0?'on':''}"></i>`).join('');out.innerHTML=`Giochi per <b>${mine} minuti</b>. Guardi gli altri per <b>${90-mine}</b>.`;msg.textContent=M[n]+' (Partita da 90 minuti, turni uguali.)'};
+  r.addEventListener('input',up);up();
+}
+function wVideo(){
+  const root=$('[data-w="video"]');if(!root)return;
+  const out=$('#v-out'),rl=$('#v-reload'),cnt=$('#v-n'),perma=$('#v-perma'),doors=$$('[data-door]',root);
+  let t=Math.round(Math.random()),reloads=0,done=null;
+  const reset=(keep)=>{if(!keep){t=Math.round(Math.random());reloads=0}done=null;cnt.textContent=reloads;rl.hidden=true;doors.forEach(d=>d.disabled=false);out.textContent='Scegli una porta.'};
+  doors.forEach(d=>d.addEventListener('click',()=>{
+    const win=+d.dataset.door===t;doors.forEach(x=>x.disabled=true);done=win?'win':'lose';rl.hidden=false;
+    if(win){out.innerHTML=reloads?`Tesoro. Ma dopo ${reloads} ${reloads===1?'ricaricamento':'ricaricamenti'} lo sapevi già: <b>hai scelto o hai ricordato?</b>`:'Tesoro, al primo colpo. <b>Questa scelta pesa.</b>';rl.textContent='Nuova scena'}
+    else if(perma.checked){out.innerHTML='Trappola. Nessun ritorno. <b>La prossima porta la sceglierai con più attenzione.</b>';rl.textContent='Nuova partita'}
+    else{out.innerHTML=reloads>=2?'Trappola. A questo punto <b>non stai scegliendo, stai estraendo.</b>':'Trappola. Niente paura: c’è il salvataggio.';rl.textContent='Carica ultimo salvataggio'}
+  }));
+  rl.addEventListener('click',()=>{if(done==='lose'&&!perma.checked){reloads++;reset(true)}else reset(false)});
+  perma.addEventListener('change',()=>reset(false));
+}
+const MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',0:'-----',1:'.----',2:'..---',3:'...--',4:'....-',5:'.....',6:'-....',7:'--...',8:'---..',9:'----.','/':'-..-.','?':'..--..','.':'.-.-.-',',':'--..--'};
+function wRadio(){
+  const inp=$('#m-t');if(!inp)return;const out=$('#m-out'),go=$('#m-go'),lamp=$('#m-lamp');let timers=[];
+  const render=()=>{const words=inp.value.toUpperCase().split(/\s+/).filter(Boolean);out.innerHTML=words.map(w=>[...w].filter(c=>MORSE[c]).map(c=>[...MORSE[c]].map(s=>`<span class="m">${s==='.'?'·':'–'}</span>`).join('')).join(' ')).join(' &nbsp;/&nbsp; ')};
+  const stop=()=>{timers.forEach(clearTimeout);timers=[];lamp.classList.remove('on');$$('.m',out).forEach(m=>m.classList.remove('lit'));go.textContent='Trasmetti'};
+  go.addEventListener('click',()=>{
+    if(timers.length){stop();return}
+    const c=ac();if(!c)return;render();
+    const u=.1,t0=c.currentTime+.08,spans=$$('.m',out),words=inp.value.toUpperCase().split(/\s+/).filter(Boolean);
+    let t=0,k=0;
+    words.forEach((w,wi)=>{[...w].filter(ch=>MORSE[ch]).forEach((ch,ci)=>{[...MORSE[ch]].forEach((s,si)=>{const d=(s==='.'?1:3)*u,sp=spans[k++];blip(600,t0+t,d,.2,'sine');const on=setTimeout(()=>{lamp.classList.add('on');sp&&sp.classList.add('lit')},(t+.08)*1000),off=setTimeout(()=>{lamp.classList.remove('on')},(t+.08+d)*1000);timers.push(on,off);t+=d+u});t+=2*u});t+=4*u});
+    timers.push(setTimeout(stop,(t+.3)*1000));go.textContent='Stop';
+  });
+  inp.addEventListener('input',()=>{stop();render()});render();
+  audioStops.push(stop);
+}
+function wGeo(){$$('.geo button').forEach(b=>b.addEventListener('click',()=>b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true')))}
+function wLibri(){
+  const r=$('#l-age');if(!r)return;const n=$('#l-n'),o=$('#l-out'),av=$('#l-av'),pg=$('#l-pgs');
+  const up=()=>{const age=+r.value,p=age<=50?50:Math.max(0,100-age);av.textContent=age;n.textContent=p;o.innerHTML=age<=50?'pagine. Fino a cinquant’anni, <b>ne devi cinquanta</b>.':(p?`pagine: 100 − ${age}. <b>Più vivi, meno devi.</b>`:'pagine. <b>Puoi giudicare dalla copertina.</b>');pg.innerHTML=Array.from({length:50},(_,i)=>`<i class="${i<p?'on':''}"></i>`).join('')};
+  r.addEventListener('input',up);up();
+}
+function wComp(){
+  const cv=$('#pr-cv');if(!cv)return;
+  const A=$('#pr-a'),B=$('#pr-b'),av=$('#pr-av'),bv=$('#pr-bv'),info=$('#pr-info'),btn=$('#pr-play');
+  const L=4;let playing=false,t0=0,raf=0,last=0;const fa=[],fb=[];
+  const gcd=(a,b)=>b?gcd(b,a%b):a;
+  const css=n=>getComputedStyle(cv).getPropertyValue(n).trim();
+  const size=()=>{const d=Math.min(window.devicePixelRatio||1,2),w=cv.clientWidth;if(w&&cv.width!==Math.round(w*d)){cv.width=Math.round(w*d);cv.height=cv.width}};
+  function draw(phase){
+    size();const ctx=cv.getContext('2d'),w=cv.width,c=w/2,a=+A.value,b=+B.value,fg=css('--fg')||'#000',ac=css('--ac')||'#fff',rA=w*.4,rB=w*.27,now=performance.now();
+    ctx.clearRect(0,0,w,w);ctx.lineWidth=w*.004;ctx.strokeStyle=fg;ctx.globalAlpha=.45;
+    [rA,rB].forEach(r=>{ctx.beginPath();ctx.arc(c,c,r,0,7);ctx.stroke()});ctx.globalAlpha=1;
+    const P=(i,n,r)=>{const t=-Math.PI/2+2*Math.PI*i/n;return[c+r*Math.cos(t),c+r*Math.sin(t)]};
+    for(let i=0;i<a;i++)if((i*b)%a===0){const j=i*b/a,p=P(i,a,rA),q=P(j,b,rB);ctx.strokeStyle=ac;ctx.lineWidth=w*.012;ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke()}
+    const bead=(p,r,f,col)=>{const k=f?Math.max(0,1-(now-f)/260):0;ctx.fillStyle=col;ctx.beginPath();ctx.arc(p[0],p[1],r*(1+.9*k),0,7);ctx.fill()};
+    for(let i=0;i<a;i++)bead(P(i,a,rA),w*.026,fa[i],fg);
+    for(let j=0;j<b;j++)bead(P(j,b,rB),w*.024,fb[j],ac);
+    if(playing){const t=-Math.PI/2+2*Math.PI*phase;ctx.strokeStyle=fg;ctx.lineWidth=w*.008;ctx.beginPath();ctx.moveTo(c,c);ctx.lineTo(c+(rA+w*.05)*Math.cos(t),c+(rA+w*.05)*Math.sin(t));ctx.stroke()}
+    ctx.fillStyle=fg;ctx.beginPath();ctx.arc(c,c,w*.014,0,7);ctx.fill();
+  }
+  function text(){const a=+A.value,b=+B.value,g=gcd(a,b),l=a*b/g;av.textContent=a;bv.textContent=b;info.innerHTML=`Giro diviso in <b>${l}</b>: l’esterno colpisce ogni ${l/a}, l’interno ogni ${l/b}. Si incontrano <b>${g} ${g===1?'volta':'volte'}</b> per giro.`}
+  const crossed=(l,n,p)=>n>=l?(p>l&&p<=n):(p>l||p<=n);
+  function loop(){
+    if(!playing)return;const ph=((AC.currentTime-t0)%L)/L,a=+A.value,b=+B.value;
+    for(let i=0;i<a;i++)if(crossed(last,ph,i/a)){fa[i]=performance.now();blip(i===0?330:262,AC.currentTime,.09,.22,'triangle')}
+    for(let j=0;j<b;j++)if(crossed(last,ph,j/b)){fb[j]=performance.now();blip(j===0?196:147,AC.currentTime,.1,.26,'sine')}
+    last=ph;draw(ph);raf=requestAnimationFrame(loop);
+  }
+  function stop(){playing=false;cancelAnimationFrame(raf);btn.textContent='Ascolta';draw(0)}
+  btn.addEventListener('click',()=>{if(playing){stop();return}const c=ac();if(!c)return;playing=true;t0=c.currentTime;last=.9999;btn.textContent='Stop';loop()});
+  [A,B].forEach(x=>x.addEventListener('input',()=>{text();if(!playing)draw(0)}));
+  text();draw(0);
+  if(window.ResizeObserver)new ResizeObserver(()=>{if(!playing)draw(0)}).observe(cv);
+  audioStops.push(stop);
+}
+function wPod(){
+  const sl=$('#po-cut');if(!sl)return;const svg=$('#po-svg'),tm=$('#po-time'),cvl=$('#po-cv'),msg=$('#po-msg');
+  const r=rnd(5),seg=[];let S=0,Pu=0;
+  for(let i=0;i<13;i++){const bars=Array.from({length:6+Math.floor(r()*8)},()=>.2+.8*r());S+=bars.length;const u=2+Math.floor(r()*7);Pu+=u+1;seg.push({bars,u})}
+  const bw=400/(S+Pu),M=[[10,'Come registrato: si sente la stanza.'],[45,'Via l’imbarazzo. Si sente ancora la persona.'],[75,'Punto di rottura: il ritmo corre, il respiro sparisce.'],[99,'Sembra un annuncio in stazione.'],[101,'Zero pause. Zero persone.']];
+  const up=()=>{
+    const cut=+sl.value/100;let x=0,h='';
+    seg.forEach(s=>{
+      s.bars.forEach(v=>{const hh=v*84;h+=`<rect x="${x.toFixed(2)}" y="${(55-hh/2).toFixed(1)}" width="${(bw*.66).toFixed(2)}" height="${hh.toFixed(1)}" fill="currentColor"/>`;x+=bw});
+      if(cut<.9)h+=`<rect x="${x.toFixed(2)}" y="48" width="${(bw*.66).toFixed(2)}" height="14" class="f-ac" rx="1"/>`;
+      x+=bw;
+      const g=s.u*(1-cut)*bw;h+=`<line x1="${x.toFixed(1)}" x2="${(x+g).toFixed(1)}" y1="55" y2="55" stroke="currentColor" stroke-width="1" opacity=".5"/>`;x+=g;
+    });
+    h+=`<rect x="${x.toFixed(1)}" y="8" width="${Math.max(0,400-x).toFixed(1)}" height="94" fill="none" stroke="currentColor" stroke-dasharray="3 4" opacity=".4"/>`;
+    svg.innerHTML=h;
+    const sec=Math.round(660+300*(1-cut));tm.textContent=Math.floor(sec/60)+'’'+String(sec%60).padStart(2,'0')+'”';cvl.textContent=sl.value+'%';
+    msg.textContent=M.find(m=>+sl.value<m[0])[1];
+  };
+  sl.addEventListener('input',up);up();
+}
+function wVibe(){
+  const root=$('[data-w="vibe"]');if(!root)return;const chips=$$('#vb-chips button'),n=$('#vb-n'),msg=$('#vb-msg'),dots=$('#vb-dots');
+  dots.innerHTML=Array.from({length:64},()=>'<i></i>').join('');const cells=$$('i',dots);
+  const up=()=>{const k=chips.filter(c=>c.getAttribute('aria-pressed')==='true').length,v=Math.pow(2,10-k);n.textContent=fmt(v);const lit=Math.ceil(v/16);cells.forEach((c,i)=>c.classList.toggle('on',i<lit));msg.textContent=k===0?'Ogni dettaglio che aggiungi dimezza le strade possibili.':k===10?'Una sola. Hai appena scritto un programma, in italiano.':k<5?'Ancora troppe strade. La macchina ne sceglierà una per te.':'Ci stai arrivando: adesso è quasi un regolamento.'};
+  chips.forEach(c=>c.addEventListener('click',()=>{c.setAttribute('aria-pressed',c.getAttribute('aria-pressed')==='true'?'false':'true');up()}));up();
+}
+function initWidgets(){wGiochi();wVideo();wRadio();wGeo();wLibri();wComp();wPod();wVibe()}
+
+/* ================= libro ================= */
+const stage=$('#stage'),book=$('#book'),prevB=$('#prev'),nextB=$('#next'),lbl=$('#lbl'),chipsEl=$('#chips');
+let mode='',f=0,total=0,leaves=[],faces=[],zt=0;
+function visiblePages(){return mode==='spread'?(f===0?[0]:f===total?[N-1]:[2*f-1,2*f]):[f]}
+function pageToF(p){return mode==='spread'?Math.ceil(p/2):p}
+function curPage(){return mode==='spread'?(f===0?0:2*f-1):f}
+const finalZ=k=>k<f?k+1:total-k;
+function layout(){
+  const W=stage.clientWidth,H=stage.clientHeight,spread=W>=860&&W/H>1.15;let pw,ph;
+  if(spread){ph=Math.min(H-10,(W-24)/2/.74);pw=ph*.74}else{pw=Math.min(W,H*.8);ph=Math.min(H-4,pw/.6)}
+  book.style.setProperty('--pw',pw.toFixed(1)+'px');book.style.setProperty('--ph',ph.toFixed(1)+'px');
+  return spread?'spread':'single';
+}
+function build(startPage){
+  stopAudio();book.innerHTML='<div class="floor"></div>';leaves=[];faces=[];
+  mode=layout();book.className='book '+mode;
+  const face=(i,c)=>`<div class="face ${c}" data-p="${i}">${PAGES[i]}</div>`;
+  if(mode==='spread'){total=N/2;for(let k=0;k<total;k++)book.insertAdjacentHTML('beforeend',`<div class="leaf">${face(2*k,'front')}${face(2*k+1,'back')}</div>`)}
+  else{total=N;for(let k=0;k<N;k++)book.insertAdjacentHTML('beforeend',`<div class="leaf">${face(k,'front')}</div>`)}
+  leaves=$$('.leaf',book);faces=[];$$('.face',book).forEach(x=>faces[+x.dataset.p]=x);
+  f=pageToF(startPage);
+  leaves.forEach((lf,k)=>{lf.classList.toggle('flipped',k<f);lf.style.zIndex=finalZ(k)});
+  refresh();initWidgets();
+}
+function refresh(){
+  const vis=visiblePages();
+  book.style.transform=mode==='spread'?(f===0?'translateX(-25%)':f===total?'translateX(25%)':'none'):'none';
+  faces.forEach((fc,i)=>{fc.inert=!vis.includes(i)});
+  prevB.disabled=f===0;nextB.disabled=f===total;
+  lbl.textContent=vis.length===1?(vis[0]===0?'Copertina':vis[0]===N-1?'Quarta di copertina':'pag. '+vis[0]):'pag. '+vis[0]+'–'+vis[1];
+  $$('.chip',chipsEl).forEach(c=>{const p=+c.dataset.p;c.setAttribute('aria-current',String(vis.includes(p)||vis.includes(p+1)&&c.dataset.p!=='2'))});
+  try{history.replaceState(null,'','#pagina-'+curPage())}catch(e){}
+}
+function setF(nf){
+  nf=Math.max(0,Math.min(total,nf));if(nf===f)return;stopAudio();
+  const dir=nf>f?1:-1,ks=[];
+  if(dir>0){for(let k=f;k<nf;k++)ks.push(k)}else{for(let k=f-1;k>=nf;k--)ks.push(k)}
+  ks.forEach((k,j)=>{const lf=leaves[k];lf.style.transitionDelay=Math.min(j,8)*70+'ms';lf.style.zIndex=500+(dir>0?k:total-k);lf.classList.toggle('flipped',dir>0)});
+  f=nf;refresh();clearTimeout(zt);
+  zt=setTimeout(()=>{leaves.forEach((lf,k)=>{lf.style.transitionDelay='';lf.style.zIndex=finalZ(k)})},1050+Math.min(ks.length,9)*70);
+}
+function goPage(p){setF(pageToF(Math.max(0,Math.min(N-1,p))))}
+function goTarget(t){if(t==='p21')return goPage(21);const a=byId(t);if(a)goPage(a.pag)}
+
+/* navigazione: chip */
+chipsEl.innerHTML=`<button class="chip ix" type="button" data-p="2" title="Indice"><i></i><span>Indice</span></button>`+ART.map(a=>`<button class="chip ${a.cls}" type="button" data-p="${a.pag}" title="${a.sez}"><i></i><span>${a.sez}</span></button>`).join('');
+chipsEl.addEventListener('click',e=>{const c=e.target.closest('.chip');if(c)goPage(+c.dataset.p)});
+prevB.addEventListener('click',()=>setF(f-1));nextB.addEventListener('click',()=>setF(f+1));
+
+/* click sul libro: link interni e margini */
+book.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');if(g){goTarget(g.dataset.go);return}
+  if(e.target.closest('button,input,label,canvas,a,summary,details,.widget'))return;
+  if(getSelection&&String(getSelection()).length)return;
+  const r=book.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,m=mode==='spread'?.12:.2;
+  if(mode==='spread'&&f===0){if(x>.5+.5*(1-m*2))setF(f+1);return}
+  if(x<m)setF(f-1);else if(x>1-m)setF(f+1);
+});
+/* tastiera */
+document.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('input,textarea,select'))return;
+  if(e.key==='ArrowRight'||e.key==='PageDown')setF(f+1);
+  else if(e.key==='ArrowLeft'||e.key==='PageUp')setF(f-1);
+  else if(e.key==='Home')setF(0);else if(e.key==='End')setF(total);
+});
+/* swipe */
+let sx=0,sy=0,sOk=false;
+stage.addEventListener('pointerdown',e=>{sOk=e.pointerType!=='mouse'&&!e.target.closest('input,button,canvas,summary,svg#po-svg');sx=e.clientX;sy=e.clientY});
+stage.addEventListener('pointerup',e=>{if(!sOk)return;sOk=false;const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)>50&&Math.abs(dy)<70)setF(f+(dx<0?1:-1))});
+/* tema */
+$('#theme').addEventListener('click',()=>{const root=document.documentElement,dark=root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;root.dataset.theme=dark?'light':'dark'});
+/* hash e resize */
+const hashPage=()=>{const m=/^#pagina-(\d+)$/.exec(location.hash);return m?Math.min(N-1,+m[1]):0};
+addEventListener('hashchange',()=>{const p=hashPage();if(!visiblePages().includes(p))goPage(p)});
+let rz=0;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{const keep=curPage(),m=layout();if(m!==mode)build(keep)},120)});
+build(hashPage());
+})();
+</script>
+</body>
+</html>
